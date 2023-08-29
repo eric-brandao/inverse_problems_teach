@@ -57,3 +57,6 @@ x = lc.cvx_solver(A, bn, np.linalg.norm(n))
 
 #%%
 lam_opt = lc.l_cuve(U, s, bn, plotit = True)
+# %%
+
+lc.gcv_lambda(U, s, bn, print_gcvfun = True)
