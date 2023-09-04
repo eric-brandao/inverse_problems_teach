@@ -23,10 +23,12 @@ d = 0.25
 
 A,x = tp.gravity_model(n = n,a = a,b = b,d = d)
 
-rhox = tp.density_sin(x, 0.5) + 0.5*tp.density_sin(x, 1.0)
+rhox = tp.density_sin(x, 0.5) + 0.5*tp.density_sin(x, 1.0)# + 0.5*tp.density_sin(x, 2.0)
 b = A @ rhox
-n = np.random.normal(loc = 0.0, scale = 0.001, size = len(b))
+n = np.random.normal(loc = 0.0, scale = 0.1, size = len(b))
 bn = b + n
+snr = 20*np.log10(np.linalg.norm(n)/np.linalg.norm(bn))
+print('SNR = {}'.format(snr))
 #%%
 [U,s,V] = lc.csvd(A)
 
@@ -35,8 +37,8 @@ bn = b + n
 #lc.plot_picard(U,s,bn, noise_norm = np.linalg.norm(n))
 
 #%%
-rhox_k = lc.tsvd(U,s,V,bn,10)
-rhox_tau = lc.ssvd(U,s,V,bn, np.linalg.norm(n))
+rhox_k = lc.tsvd(U,s,V,bn,7)
+rhox_tau = lc.ssvd(U,s,V,bn, 0.5*np.linalg.norm(n))
 
 plt.figure()
 plt.plot(x, rhox_k)
@@ -56,7 +58,14 @@ bn = b + n
 x = lc.cvx_solver(A, bn, np.linalg.norm(n))
 
 #%%
-lam_opt = lc.l_cuve(U, s, bn, plotit = True)
+lam_l = lc.l_cuve(U, s, bn, plotit = True, plot_curv = True)
 # %%
 
-lc.gcv_lambda(U, s, bn, print_gcvfun = True)
+lam_gcv = lc.gcv_lambda(U, s, bn, print_gcvfun = True)
+
+#%%
+x_delta, lam_dp = lc.discrep(U, s, V.T, bn, np.linalg.norm(n), x_0=None)
+
+#%%
+# lam_ncp, dist, reg_param = 
+lam_gcv, dist = lc.ncp(U, s, bn)
