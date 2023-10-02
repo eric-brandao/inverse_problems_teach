@@ -22,7 +22,7 @@ from decompositionclass import Decomposition
 
 #%%
 air = AirProperties(temperature = 20)
-controls = AlgControls(c0 = air.c0, freq_vec = [500, 1000, 1005, 2000])
+controls = AlgControls(c0 = air.c0, freq_vec = [1000])
 
 receivers = Receiver()
 receivers.random_3d_array(x_len=0.6, y_len=0.8, z_len=0.25, n_total = 290, zr = 0.1)
@@ -33,34 +33,34 @@ receivers.random_3d_array(x_len=0.6, y_len=0.8, z_len=0.25, n_total = 290, zr = 
 # receivers.planar_array(x_len = 0.3, n_x = 10, y_len = 0.3, n_y = 10, zr = 0.1)
 #%%
 
-# field1 = FreeField(air, controls, receivers)
-# field1.planewave_ff(theta = np.deg2rad(-45), phi = np.deg2rad(30))
+field1 = FreeField(air, controls, receivers)
+field1.planewave_ff(theta = np.deg2rad(-45), phi = np.deg2rad(30))
 
-# # field2 = FreeField(air, controls, receivers)
-# # field2.planewave_ff(theta = np.deg2rad(45), phi = np.deg2rad(30))
-
-# field = FreeField(air, controls, receivers)
-# field.planewave_ff(theta = np.deg2rad(45), phi = np.deg2rad(60))
-# field.pres_s[0] += field1.pres_s[0]
-# field.add_noise(snr = 30)
-# # field.plot_pres()
-# field.plot_scene(vsam_size=2)
-
-#%%
-theta = np.deg2rad(-45)
-phi = np.deg2rad(30)
-s_coord1 = sph2cart(2, np.pi/2-theta, phi)
-theta = np.deg2rad(45)
-phi = np.deg2rad(60)
-s_coord2 = sph2cart(2, np.pi/2-theta, phi)
-source = Source(coord = s_coord1)
-source.add_sources(coord = s_coord2)
+# field2 = FreeField(air, controls, receivers)
+# field2.planewave_ff(theta = np.deg2rad(45), phi = np.deg2rad(30))
 
 field = FreeField(air, controls, receivers)
-field.monopole_ff(sources = source)
-field.pres_s[0] += field.pres_s[1]
-field.add_noise(snr = 60)
+field.planewave_ff(theta = np.deg2rad(45), phi = np.deg2rad(60))
+field.pres_s[0] += field1.pres_s[0]
+field.add_noise(snr = 30)
+# field.plot_pres()
 field.plot_scene(vsam_size=2)
+
+#%%
+# theta = np.deg2rad(-45)
+# phi = np.deg2rad(30)
+# s_coord1 = sph2cart(2, np.pi/2-theta, phi)
+# theta = np.deg2rad(45)
+# phi = np.deg2rad(60)
+# s_coord2 = sph2cart(2, np.pi/2-theta, phi)
+# source = Source(coord = s_coord1)
+# source.add_sources(coord = s_coord2)
+
+# field = FreeField(air, controls, receivers)
+# field.monopole_ff(sources = source)
+# field.pres_s[0] += field.pres_s[1]
+# field.add_noise(snr = 30)
+# field.plot_scene(vsam_size=2)
 #%%
 
 ff_ded = Decomposition(field.pres_s[0], controls = controls, 
@@ -72,3 +72,9 @@ ff_ded.pk_interpolate()
 #%%
 ff_ded.plot_pk_sphere(freq=2000, db=True, dinrange=12, travel=False)
 ff_ded.plot_pk_map(freq=2000, db=True, dinrange=12)
+
+#%%
+ff_ded = Decomposition(field.pres_s[0], controls = controls, 
+                       receivers=receivers, regu_par = 'GCV')
+ff_ded.wavenum_dir(n_waves = 162, plot = False)
+ff_ded.pk_cs(snr=30, headroom = 0)

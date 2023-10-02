@@ -58,7 +58,7 @@ bn = b + n
 x = lc.cvx_solver(A, bn, np.linalg.norm(n))
 
 #%%
-lam_l = lc.l_cuve(U, s, bn, plotit = True)
+lam_l = lc.l_curve(U, s, bn, plotit = True)
 # %%
 
 lam_gcv = lc.gcv_lambda(U, s, bn, print_gcvfun = True)
@@ -69,3 +69,16 @@ x_delta, lam_dp = lc.discrep(U, s, V.T, bn, np.linalg.norm(n), x_0=None)
 #%%
 # lam_ncp, dist, reg_param = 
 lam_ncp, dist = lc.ncp(U, s, bn, printncp=True)
+
+#%%
+H = A.astype(complex)
+bnn = bn.astype(complex)
+
+rhox_cvx = lc.cvx_solver_c(H, bnn, np.linalg.norm(n), l_norm = 2)
+
+plt.figure()
+plt.plot(x, rhox_cvx, label = 'cvx')
+plt.plot(x, rhox_tau)
+plt.plot(x, rhox)
+plt.legend()
+plt.ylim((-0.1,1.5))
