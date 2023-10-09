@@ -16,10 +16,11 @@ import lcurve_functions as lc
 from controlsair import compare_alpha, compare_spk
 from controlsair import AlgControls, AirProperties, load_cfg, sph2cart
 from sources import Source
-from receivers import Receiver
+# from receivers import Receiver
+import receivers
 from field_free import FreeField
 from decompositionclass import Decomposition
-
+from decomposition_ev_ig import DecompositionEv2
 #%%
 air = AirProperties(temperature = 20)
 controls = AlgControls(c0 = air.c0, freq_vec = [1000])
@@ -78,3 +79,17 @@ ff_ded = Decomposition(field.pres_s[0], controls = controls,
                        receivers=receivers, regu_par = 'GCV')
 ff_ded.wavenum_dir(n_waves = 162, plot = False)
 ff_ded.pk_cs(snr=30, headroom = 0)
+
+#%%
+recs = receivers.Receiver()
+recs.hemispherical_array(radius = 1, n_rec_target = 642)
+
+#%%
+fig = plt.figure()
+ax = plt.axes(projection ="3d")
+ax.scatter(recs.coord[:,0], recs.coord[:,1], recs.coord[:,2])
+#ax.scatter(recs.pdir_all[:,0], recs.pdir_all[:,1], recs.pdir_all[:,2])
+
+#%%
+pk = DecompositionEv2()
+pk.prop_dir(n_waves = 642, plot = True)
