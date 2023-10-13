@@ -82,7 +82,7 @@ ff_ded.pk_cs(snr=30, headroom = 0)
 
 #%%
 recs = receivers.Receiver()
-recs.hemispherical_array(radius = 1, n_rec_target = 642)
+recs.hemispherical_array2(radius = 1, n_rec_target = 642)
 
 #%%
 fig = plt.figure()
@@ -92,4 +92,4 @@ ax.scatter(recs.coord[:,0], recs.coord[:,1], recs.coord[:,2])
 
 #%%
 pk = DecompositionEv2()
-pk.prop_dir(n_waves = 642, plot = True)
+pk.prop_dir(n_waves = 642, plot = False)
