@@ -1,6 +1,8 @@
 import sys
 sys.path.append('D:/Work/dev/insitu_sim_python/insitu')
-from decomp_quad_EU import Decomposition_QDT  # Quadrature Method decomposition
+import decomp_quad_EU as dqdt_eu
+import decomp_quad as dqdt
+import decomp_quad_v2 as dqdt_v2
 #from decomp2waves import Decomposition_2W  # Plane waves
 from decomp2mono import Decomposition_2M  # Monopoles
 from controlsair import AirProperties, AlgControls, sph2cart  # Controls
@@ -11,7 +13,7 @@ from receivers import Receiver  # Receivers
 import matplotlib.pyplot as plt  # Plot
 from sources import Source  # Source
 import numpy as np  # Numpy library
-plt.rcParams.update({'font.size': 22})
+plt.rcParams.update({'font.size': 14})
 
 import lcurve_functions as lc
 
@@ -22,7 +24,7 @@ phi = 0
 
 main_folder = 'D:/Work/UFSM/Disciplinas/Problemas Inversos/10_DCISM/saved_fields/'
 
-f_name_field_nlr_zs = 'NLR_zs_d5cm_el0d_az0d_r30cm_resist5k_z__0'
+f_name_field_nlr_zs = 'NLR_zs_d5cm_el0d_az0d_r30cm_resist14k_z__0'
 
 field_nlr_zs = NLRInfSph()  # NLR field
 field_nlr_zs.load(path=main_folder, filename=f_name_field_nlr_zs)
@@ -38,38 +40,62 @@ for jf in range(0, len(field_nlr_zs.controls.freq)):  # Absorption coefficient e
                                           (zs_nlr_mean[jf] * np.cos(theta) + 1)))) ** 2
 #%% Field to decomp
 
-f_name_field_nlr = 'NLR_Inf_d5cm_el0d_az0d_r30cm_resist5k_r3d_128_mics_30x30x5cm'
+f_name_field_nlr = 'NLR_Inf_d5cm_el0d_az0d_r30cm_resist14k_r3d_128_mics_30x30x5cm'
 
 field_nlr = NLRInfSph()  # NLR field
 field_nlr.load(path=main_folder, filename=f_name_field_nlr)
-snr = 30
+snr = 40
 field_nlr.add_noise(snr=snr, uncorr=False)  # array
 
 
 #%%
-ng = 125
-a = -0.1
-b = 2000
+ng = 25
+a = 0
+b = 30
 retraction = 0
 
 source_coord = sph2cart(r, np.pi / 2 - theta, phi)  # Source coordinates
-source = Source(coord=source_coord)
+#source = Source(coord=source_coord)
 
-decomp_qdt = Decomposition_QDT(p_mtx=field_nlr.pres_s[0], controls=field_nlr.controls, material=field_nlr.material,
-                               receivers=field_nlr.receivers, source_coord=source_coord, quad_order=ng)
+decomp_qdt_v2 = dqdt_v2.Decomposition_QDT(p_mtx=field_nlr.pres_s[0], controls=field_nlr.controls,
+                               receivers=field_nlr.receivers, source_coord=source_coord, quad_order=ng,
+                                            a = a, b = b, retraction = retraction, image_source_on = True,
+                                            regu_par = 'l-curve')
+decomp_qdt_v2.gauss_legendre_sampling()
+#decomp_qdt_v2.gauss_laguerre_sampling()
+#decomp_qdt_v2.uniform_sampling()
+#decomp_qdt_v2.mid_point_sampling()
 
-decomp_qdt.pk_tikhonov(plot_l=False, method='Tikhonov', a=a, b=b, retraction=retraction)
-decomp_qdt.zs(a=a, b=b, Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[theta], avgZs=True, retraction=retraction);  # Zs
-nmse_qdt_ps = lc.nmse_freq(decomp_qdt.p_s , field_nlr_zs.pres_s[0])
-nmse_qdt_uzs = lc.nmse_freq(decomp_qdt.uz_s , field_nlr_zs.uz_s[0])
+#r, zr, r1, rq = decomp_qdt_v2.get_rec_parameters(field_nlr.receivers)
+#iq = decomp_qdt_v2.kernel_p(18, rq)
+decomp_qdt_v2.pk_tikhonov(plot_l=False, method='Tikhonov')
+#decomp_qdt_v2.least_squares_pk()
+# decomp_qdt_v2.reconstruct_p(field_nlr_zs.receivers)
 
-pk = np.array(decomp_qdt.pk)
-alpha_pk = np.zeros(14)
-for jf in np.arange(14):
-    Qref = np.sum(pk[jf,1:])/pk[jf,0]
-    alpha_pk[jf] = 1-(np.abs(Qref))**2
+
+#r, zr, r1, rq = decomp_qdt_v2.get_rec_parameters(field_nlr_zs.receivers)
+#dqdt_v2.kernel_uz(18, rq, decomp_qdt_v2.hs + zr - 1j * decomp_qdt_v2.q)
+# decomp_qdt_v2.reconstruct_uz(field_nlr_zs.receivers)
+decomp_qdt_v2.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[0], avgZs=True);  # Zs
+nmse_qdt_ps = lc.nmse_freq(decomp_qdt_v2.p_recon , field_nlr_zs.pres_s[0])
+nmse_qdt_uzs = lc.nmse_freq(decomp_qdt_v2.uz_recon , field_nlr_zs.uz_s[0])
+
+# pk = np.array(decomp_qdt_v2.pk)
+# alpha_pk = np.zeros(15)
+# for jf in np.arange(15):
+#     Qref = np.sum(np.abs(pk[jf,1])**2)/np.abs(pk[jf,0])**2
+#     alpha_pk[jf] = 1-(np.abs(Qref))
+
 #%%
-decomp_mono = Decomposition_2M(p_mtx=field_nlr.pres_s[0], controls=field_nlr.controls, material=field_nlr.material,
+# decomp_qdt = dqdt.Decomposition_QDT(p_mtx=field_nlr.pres_s[0], controls=field_nlr.controls,
+#                                receivers=field_nlr.receivers, source_coord=source_coord, quad_order=ng)
+
+# decomp_qdt.pk_tikhonov(plot_l=True, method='Tikhonov', a=a, b=b, retraction=retraction)
+# decomp_qdt.zs(a=a, b=b, Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[theta], avgZs=True, retraction=retraction);  # Zs
+# nmse_qdt_ps = lc.nmse_freq(decomp_qdt.p_s , field_nlr_zs.pres_s[0])
+# nmse_qdt_uzs = lc.nmse_freq(decomp_qdt.uz_s , field_nlr_zs.uz_s[0])
+#%%
+decomp_mono = Decomposition_2M(p_mtx=field_nlr.pres_s[0], controls=field_nlr.controls,
                                receivers=field_nlr.receivers, source_coord=source_coord)
 decomp_mono.pk_tikhonov(plot_l=False, method='Tikhonov')
 decomp_mono.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[theta], avgZs=True); # Zs
@@ -78,8 +104,8 @@ decomp_mono.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[theta], avgZs=True); # Zs
 plt.figure()
 plt.semilogx(field_nlr.controls.freq, field_nlr.material.alpha, label = 'Miki')
 plt.semilogx(field_nlr.controls.freq, alpha_nlr, label = 'NLR')
-plt.semilogx(decomp_qdt.controls.freq, decomp_qdt.alpha[0,:], label = 'QDT')
-# plt.semilogx(decomp_qdt.controls.freq, alpha_pk, label = 'QDT Q')
+plt.semilogx(decomp_qdt_v2.controls.freq, decomp_qdt_v2.alpha[0,:], label = 'QDT')
+# plt.semilogx(decomp_qdt_v2.controls.freq, alpha_pk, label = 'QDT Q')
 plt.semilogx(decomp_mono.controls.freq, decomp_mono.alpha[0,:], label = '2M')
 plt.legend()
 plt.xlabel('Frequency [Hz]')
@@ -88,6 +114,7 @@ plt.grid()
 plt.ylim((-0.2, 1.2))
 plt.tight_layout()
 
+#%%
 plt.figure()
 plt.loglog(field_nlr.controls.freq, nmse_qdt_ps, label = 'NMSE ps QDT')
 plt.loglog(field_nlr.controls.freq, nmse_qdt_uzs, label = 'NMSE uzs QDT')
