@@ -24,7 +24,7 @@ phi = 0
 
 main_folder = 'D:/Work/UFSM/Disciplinas/Problemas Inversos/10_DCISM/saved_fields/'
 
-f_name_field_nlr_zs = 'NLR_zs_d5cm_el0d_az0d_r30cm_resist14k_z__0'
+f_name_field_nlr_zs = 'NLR_zs_d10cm_el0d_az0d_r30cm_resist5k_z__0'
 
 field_nlr_zs = NLRInfSph()  # NLR field
 field_nlr_zs.load(path=main_folder, filename=f_name_field_nlr_zs)
@@ -40,7 +40,7 @@ for jf in range(0, len(field_nlr_zs.controls.freq)):  # Absorption coefficient e
                                           (zs_nlr_mean[jf] * np.cos(theta) + 1)))) ** 2
 #%% Field to decomp
 
-f_name_field_nlr = 'NLR_Inf_d5cm_el0d_az0d_r30cm_resist14k_r3d_128_mics_30x30x5cm'
+f_name_field_nlr = 'NLR_Inf_d10cm_el0d_az0d_r30cm_resist5k_r3d_128_mics_30x30x5cm'
 
 field_nlr = NLRInfSph()  # NLR field
 field_nlr.load(path=main_folder, filename=f_name_field_nlr)
@@ -49,7 +49,7 @@ field_nlr.add_noise(snr=snr, uncorr=False)  # array
 
 
 #%%
-ng = 25
+ng = 30
 a = 0
 b = 30
 retraction = 0
@@ -76,7 +76,7 @@ decomp_qdt_v2.pk_tikhonov(plot_l=False, method='Tikhonov')
 #r, zr, r1, rq = decomp_qdt_v2.get_rec_parameters(field_nlr_zs.receivers)
 #dqdt_v2.kernel_uz(18, rq, decomp_qdt_v2.hs + zr - 1j * decomp_qdt_v2.q)
 # decomp_qdt_v2.reconstruct_uz(field_nlr_zs.receivers)
-decomp_qdt_v2.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[0], avgZs=True);  # Zs
+decomp_qdt_v2.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[np.deg2rad(0)], avgZs=True);  # Zs
 nmse_qdt_ps = lc.nmse_freq(decomp_qdt_v2.p_recon , field_nlr_zs.pres_s[0])
 nmse_qdt_uzs = lc.nmse_freq(decomp_qdt_v2.uz_recon , field_nlr_zs.uz_s[0])
 
@@ -103,7 +103,7 @@ decomp_mono.zs(Lx=0.1, n_x=21, Ly=0.1, n_y=21, theta=[theta], avgZs=True); # Zs
 #%%
 plt.figure()
 plt.semilogx(field_nlr.controls.freq, field_nlr.material.alpha, label = 'Miki')
-plt.semilogx(field_nlr.controls.freq, alpha_nlr, label = 'NLR')
+plt.semilogx(field_nlr_zs.controls.freq, alpha_nlr, label = 'NLR')
 plt.semilogx(decomp_qdt_v2.controls.freq, decomp_qdt_v2.alpha[0,:], label = 'QDT')
 # plt.semilogx(decomp_qdt_v2.controls.freq, alpha_pk, label = 'QDT Q')
 plt.semilogx(decomp_mono.controls.freq, decomp_mono.alpha[0,:], label = '2M')
@@ -126,10 +126,72 @@ plt.grid()
 plt.tight_layout()
 
 #%%
+theta_deg = np.array([0, 45])
 
+mat = PorousAbsorber(air = field_nlr.air, controls = field_nlr.controls)
+mat.miki(resistivity = field_nlr.material.resistivity)
+alpha_pw_ref = np.zeros((len(theta_deg), len(field_nlr.controls.k0)))
+for jthe in np.arange(len(theta_deg)):
+    _,_,alpha_pw_ref[jthe,:] = mat.layer_over_rigid(thickness = field_nlr.material.thickness, 
+                                 theta = np.deg2rad(theta_deg[jthe]))
 
+plt.figure()
+plt.semilogx(mat.freq, alpha_pw_ref[0,:], label = 'Miki - {}deg'.format(theta_deg[0]))
+plt.semilogx(mat.freq, alpha_pw_ref[1,:], label = 'Miki - {}deg'.format(theta_deg[1]))
+plt.semilogx(decomp_qdt_v2.controls.freq, decomp_qdt_v2.alpha[0,:], label = 'QDT')
+#plt.semilogx(mat.freq, alpha_pw_ref[2,:], label = 'Miki - {}deg'.format(theta_deg[2]))
+plt.legend()
+plt.xlabel('Frequency [Hz]')
+plt.ylabel(r'$\alpha$ [-]')
+plt.grid()
+plt.ylim((-0.2, 1.2))
+#%% Compute plane wave ref.coef
+weights_vec = np.zeros(len(decomp_qdt_v2.weights)+1)
+weights_vec[0] = 1
+weights_vec[1:] = decomp_qdt_v2.weights
 
+Rp_s = np.zeros(len(field_nlr.controls.k0), dtype = 'complex')
+Rp = np.zeros(len(field_nlr.controls.k0), dtype = 'complex')
+for jf, k0 in enumerate(field_nlr.controls.k0):
+    kernel_vec = np.zeros(len(decomp_qdt_v2.weights)+1, dtype = 'complex')
+    kernel_vec[0] = 1
+    kernel_vec[1:] = np.exp(-1j*decomp_qdt_v2.q * k0 * np.cos(np.deg2rad(theta_deg[0])))
+    s_vec = decomp_qdt_v2.pk[1:, jf]/decomp_qdt_v2.pk[0,jf]
+    fun_vec = s_vec * kernel_vec
+    #print(np.linalg.norm(fun_vec-s_vec))
+    Rp_s[jf] = np.dot(weights_vec, s_vec) #np.dot(weights_vec, fun_vec)
+    Rp[jf] = np.dot(weights_vec, fun_vec)
+alpha_pw_rec_s = 1 - (np.abs(Rp_s))**2
+alpha_pw_rec = 1 - (np.abs(Rp))**2
+#%%
+plt.figure()
+plt.semilogx(mat.freq, alpha_pw_ref[0,:], label = 'Miki - {}deg'.format(theta_deg[0]))
+plt.semilogx(mat.freq, alpha_pw_ref[1,:], label = 'Miki - {}deg'.format(theta_deg[1]))
+plt.semilogx(field_nlr.controls.freq, alpha_pw_rec_s, label = '{}deg'.format(theta_deg[0]))
+plt.semilogx(field_nlr.controls.freq, alpha_pw_rec, label = '{}deg'.format(theta_deg[0]))
+plt.semilogx(field_nlr.controls.freq, 1 - (np.abs(decomp_qdt_v2.pk[1, :]/decomp_qdt_v2.pk[0,:]))**2, label = '{}deg'.format(theta_deg[0]))
+plt.legend()
+plt.xlabel('Frequency [Hz]')
+plt.ylabel(r'$\alpha$ [-]')
+plt.grid()
+plt.ylim((-0.2, 1.2))
+plt.tight_layout()
 
+#%%
+Vp_recon_surf = decomp_qdt_v2.p_recon_ref/decomp_qdt_v2.p_recon_inc
+Vp_recon_mean = np.mean(Vp_recon_surf, axis = 0)
+alpha_recon_mean = 1 - (np.abs(Vp_recon_mean))**2
+
+plt.figure()
+plt.semilogx(mat.freq, alpha_pw_ref[0,:], label = 'Miki - {}deg'.format(theta_deg[0]))
+plt.semilogx(mat.freq, alpha_pw_ref[1,:], label = 'Miki - {}deg'.format(theta_deg[1]))
+plt.semilogx(field_nlr.controls.freq, alpha_recon_mean, label = 'Vp_recon')
+plt.legend()
+plt.xlabel('Frequency [Hz]')
+plt.ylabel(r'$\alpha$ [-]')
+plt.grid()
+plt.ylim((-0.2, 1.2))
+plt.tight_layout()
 
 
 # # --------------------------------------------------------------------------------------------------------------------------
